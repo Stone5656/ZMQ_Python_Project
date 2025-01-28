@@ -1,3 +1,4 @@
+import argparse
 import time
 import cv2
 import zmq
@@ -17,10 +18,15 @@ logging.basicConfig(
 
 @dataclass
 class CameraConfig:
+    # 解像度の幅（横ピクセル数）
     width: int = 1280
+    # 解像度の高さ（縦ピクセル数）
     height: int = 720
+    # フレームレート（1秒間に取得するフレーム数）
     fps: int = 60
+    # JPEG画像の圧縮率（0-100の範囲、高いほど高品質）
     jpeg_quality: int = 85
+    # zlib圧縮レベル（0-9の範囲、高いほど圧縮率が高いが遅くなる）
     zlib_level: int = 1
 
 
@@ -93,15 +99,13 @@ class CameraManager:
 
 
 class StreamServer:
-    def __init__(self, manager: CameraManager):
+    def __init__(self, manager: CameraManager, port: int):
         self.manager = manager
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.PUB)
-        self.socket.bind("tcp://*:5555")
+        self.socket.bind(f"tcp://*:{port}")
 
     def start_streaming(self, camera_id: int):
-        """ストリーミングスレッドの開始"""
-
         def streaming_task():
             while self.manager.running.is_set():
                 data = self.manager.get_frame(camera_id)
@@ -114,24 +118,48 @@ class StreamServer:
 
         thread = threading.Thread(target=streaming_task, daemon=True)
         thread.start()
-        return thread
+
+
+def parse_arguments():
+    """コマンドライン引数の解析"""
+    parser = argparse.ArgumentParser(description="ZeroMQ Camera Streamer")
+    parser.add_argument("--camera_id", type=int, default=0, help="使用するカメラのID")
+    parser.add_argument("--width", type=int, default=1280, help="カメラ解像度の幅")
+    parser.add_argument("--height", type=int, default=720, help="カメラ解像度の高さ")
+    parser.add_argument("--fps", type=int, default=30, help="フレームレート")
+    parser.add_argument("--jpeg_quality", type=int, default=85, help="JPEG圧縮率")
+    parser.add_argument("--zlib_level", type=int, default=1, help="zlib圧縮レベル")
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    config = CameraConfig(width=640, height=480, fps=30, jpeg_quality=90, zlib_level=1)
+    args = parse_arguments()
+
+    config = CameraConfig(
+        width=args.width,
+        height=args.height,
+        fps=args.fps,
+        jpeg_quality=args.jpeg_quality,
+        zlib_level=args.zlib_level,
+    )
 
     manager = CameraManager(config)
-    server = StreamServer(manager)
+    # カメラIDとポートの対応付け
+    cameras = [(0, 5555), (1, 5556)]
 
-    # カメラ0を初期化してストリーミング開始
-    if manager.initialize_camera(0):
-        server.start_streaming(0)
-        logging.info("Streaming started for camera 0")
+    servers = []
+    for camera_id, port in cameras:
+        if manager.initialize_camera(camera_id):
+            server = StreamServer(manager, port)
+            server.start_streaming(camera_id)
+            servers.append(server)
+            logging.info(f"Streaming started for camera {camera_id} on port {port}")
 
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            manager.running.clear()
-            logging.info("Shutting down...")
-            manager.release_camera(0)
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        manager.running.clear()
+        logging.info("Shutting down...")
+        for camera_id, _ in cameras:
+            manager.release_camera(camera_id)
