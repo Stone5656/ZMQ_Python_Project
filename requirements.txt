@@ -1,0 +1,3 @@
+Flask
+PyQt5
+opencv-python-headless

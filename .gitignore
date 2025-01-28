@@ -1,0 +1,35 @@
+# ビルドディレクトリと中間ファイル
+build/
+*.o
+*.obj
+*.so
+*.dll
+*.dylib
+*.exe
+*.out
+*.a
+*.lib
+
+# IDE関連ファイル
+.vscode/
+.idea/
+
+# システムファイル
+.DS_Store
+Thumbs.db
+
+# CMakeキャッシュ
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# ログファイル
+*.log
+*.tmp
+*.swp
+
+# テスト結果
+Testing/
+test-results.xml
+
+debug_frame.jpg
