@@ -145,7 +145,7 @@ if __name__ == "__main__":
 
     manager = CameraManager(config)
     # カメラIDとポートの対応付け
-    cameras = [(0, 5555), (1, 5556)]
+    cameras = [(0, 5554), (2, 5556)]  #
 
     servers = []
     for camera_id, port in cameras:
